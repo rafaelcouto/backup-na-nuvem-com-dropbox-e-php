@@ -8,7 +8,7 @@ require_once 'vendor/autoload.php';
 require_once 'class/BackupDropbox.php';
 
 // Como o processo de upload pode ser demorado, retiramos
-// o limite de excecução do script
+// o limite de execução do script
 set_time_limit(0);
 
 // Dados do aplicativo no Dropbox
