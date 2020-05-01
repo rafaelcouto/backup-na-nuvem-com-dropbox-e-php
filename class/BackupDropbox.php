@@ -2,7 +2,7 @@
 
 class BackupDropbox
 {
-    /** @var Client */
+    /** @var \Spatie\Dropbox\Client */
     private $dropbox;
 
     /**
