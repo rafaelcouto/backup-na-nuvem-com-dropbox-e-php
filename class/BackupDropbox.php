@@ -1,8 +1,11 @@
 <?php
 
+use Spatie\Dropbox\Client;
+use Spatie\Dropbox\Exceptions\BadRequest;
+
 class BackupDropbox
 {
-    /** @var \Dropbox\Client */
+    /** @var Client */
     private $dropbox;
 
     /**
@@ -10,11 +13,10 @@ class BackupDropbox
      * do nome do aplicativo
      *
      * @param $token
-     * @param $app
      */
-    public function __construct($token, $app)
+    public function __construct($token)
     {
-        $this->dropbox = new \Dropbox\Client($token, $app);
+        $this->dropbox = new Client($token);
     }
 
     /**
@@ -28,10 +30,31 @@ class BackupDropbox
     public function uploadFile($localFile, $remoteFile)
     {
         $fp = fopen($localFile, "rb");
-        $this->dropbox->uploadFile($remoteFile, \Dropbox\WriteMode::add(), $fp);
-        fclose($fp);
+        $this->dropbox->upload($remoteFile, $fp);
 
         echo "Arquivo '{$localFile}' enviado para '{$remoteFile}'. " . PHP_EOL;
+    }
+
+    /**
+     * @param string $remoteFolder Caminho da pasta no Dropbox
+     * @return array
+     */
+    public function getAllEntries($remoteFolder) {
+
+        // Buscamos as informações da pasta
+        try {
+            $this->dropbox->getMetadata($remoteFolder);
+        } catch (BadRequest $ex) {
+            // Se a pasta não existir, criamos ela
+            if ($ex->dropboxCode == 'path') {
+                $this->dropbox->createFolder($remoteFolder);
+            }
+        }
+
+        // Buscando todas as entradas da pasta no Dropbox (recursivo)
+        $response = $this->dropbox->listFolder($remoteFolder, true);
+
+        return $response['entries'];
     }
 
     /**
@@ -39,21 +62,24 @@ class BackupDropbox
      *
      * @param string $localFolder Caminho da pasta no servidor
      * @param string $remoteFolder Caminho da pasta no Dropbox
-     *
+     * @param array|null $entries Entradas da pasta inicial
      * @return void
      */
-    public function uploadFolder($localFolder, $remoteFolder)
+    public function uploadFolder($localFolder, $remoteFolder, $entries = null)
     {
         // Se não for uma pasta válida, sai do método
         if (!is_dir($localFolder)) {
             return;
         }
 
-        // Buscando itens da pasta no servidor
-        $files = new \DirectoryIterator($localFolder);
+        // Para evitar ficar fazendo uma requisição para cada subpasta, fazemos apenas
+        // uma única requisição buscamos todos os arquivos da pasta inicial
+        if ($entries === null) {
+            $entries = $this->getAllEntries($remoteFolder);
+        }
 
-        // Buscando itens da pasta no Dropbox
-        $metadata = $this->dropbox->getMetadataWithChildren($remoteFolder);
+        // Buscando itens da pasta no servidor
+        $files = new DirectoryIterator($localFolder);
 
         // Passando pelos itens no servidor
         foreach ($files as $file) {
@@ -66,14 +92,14 @@ class BackupDropbox
             // Se o item for uma pasta
             if ($file->isDir()) {
                 // Chamamos o método novamente passando como parâmetro inicial a pasta atual (recursividade)
-                $this->uploadFolder($file->getRealPath(), $remoteFolder . "/$file");
+                $this->uploadFolder($file->getRealPath(), $remoteFolder . "/$file", $entries);
                 continue;
             }
 
             // Se o item for um arquivo
             if ($file->isFile()) {
                 // Verificamos se o arquivo já existe no Dropbox
-                $remoteFileExists = $this->checkIfRemoteFileExistsFromMetadata($metadata, $file->getFilename());
+                $remoteFileExists = $this->checkIfRemoteFileExistsFromEntries($entries, $file->getFilename());
                 // Se não existir
                 if (!$remoteFileExists) {
                     // Fazemos upload do arquivo para o Dropbox
@@ -86,28 +112,23 @@ class BackupDropbox
     }
 
     /**
-     * Verifica se o arquivo existe no Dropbox a partir do metadata
+     * Verifica se o arquivo existe no Dropbox a partir das entradas
      *
-     * @param array $metadata Dados da pasta do Dropbox
+     * @param array $entries Entradas da pasta do Dropbox
      * @param string $fileName Nome do arquivo no Dropbox
      *
      * @return bool
      */
-    private function checkIfRemoteFileExistsFromMetadata($metadata, $fileName)
+    private function checkIfRemoteFileExistsFromEntries($entries, $fileName)
     {
-        // Se não houver dados, o arquivo não existe
-        if (empty($metadata)) {
-            return false;
-        }
-
         // Passando pelos itens
-        foreach ($metadata['contents'] as $remoteFile) {
-            // Se for uma pasta passamos para o próximo item
-            if ($remoteFile['is_dir']) {
+        foreach ($entries as $remoteFile) {
+            // Se não for um arquivo passamos para o próximo item
+            if ($remoteFile['.tag'] != 'file') {
                 continue;
             }
             // Se for o arquivo que procuramos
-            if (basename($remoteFile['path']) == $fileName) {
+            if (basename($remoteFile['path_display']) == $fileName) {
                 return true;
             }
         }

@@ -13,8 +13,7 @@ set_time_limit(0);
 
 // Dados do aplicativo no Dropbox
 $token = "kWj4ECFc8RFAMlaCNLL3Z6Cmh0yAFPYNXYzmJ8q5a9ZRXn8pBq8Pfg1InYxBts08";
-$app = "rafaelcouto-backup";
 
 // Instanciando objeto e copiando arquivos e sub-pastas da pasta 'documentos'
-$backup = new BackupDropbox($token, $app);
+$backup = new BackupDropbox($token);
 $backup->uploadFolder('documentos', '/documentos');
