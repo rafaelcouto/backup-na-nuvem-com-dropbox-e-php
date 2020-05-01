@@ -1,8 +1,5 @@
 <?php
 
-use Spatie\Dropbox\Client;
-use Spatie\Dropbox\Exceptions\BadRequest;
-
 class BackupDropbox
 {
     /** @var Client */
@@ -16,7 +13,7 @@ class BackupDropbox
      */
     public function __construct($token)
     {
-        $this->dropbox = new Client($token);
+        $this->dropbox = new \Spatie\Dropbox\Client($token);
     }
 
     /**
@@ -44,7 +41,7 @@ class BackupDropbox
         // Buscamos as informações da pasta
         try {
             $this->dropbox->getMetadata($remoteFolder);
-        } catch (BadRequest $ex) {
+        } catch (\Spatie\Dropbox\Exceptions\BadRequest $ex) {
             // Se a pasta não existir, criamos ela
             if ($ex->dropboxCode == 'path') {
                 $this->dropbox->createFolder($remoteFolder);
