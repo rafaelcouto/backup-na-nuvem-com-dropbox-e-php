@@ -32,6 +32,9 @@ class BackupDropbox
     }
 
     /**
+     * A partir de uma pasta remota do Dropbox, retorna todas
+     * as entradas (arquivos e pastas)
+     * 
      * @param string $remoteFolder Caminho da pasta no Dropbox
      * @return array
      */
